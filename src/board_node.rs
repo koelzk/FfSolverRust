@@ -16,16 +16,16 @@ impl Ord for BoardNode {
     }
 }
 
+impl PartialOrd for BoardNode {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
 impl Eq for BoardNode {}
 
 impl PartialEq for BoardNode {
     fn eq(&self, other: &Self) -> bool {
         self.score == other.score
-    }
-}
-
-impl PartialOrd for BoardNode {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.score.partial_cmp(&other.score)
     }
 }

@@ -86,6 +86,22 @@ impl Board {
         }        
     }
 
+    pub fn normalize_order(&mut self)
+    {
+        self.cascades.sort_by_key(|cc| BoardNormalization::cascade_rank(cc));
+
+        if self.major_fdn_low == self.major_fdn_high {
+            self.major_fdn_low = 21;
+            self.major_fdn_high = 21;
+        }
+    }
+
+    pub fn normalize(&mut self)    
+    {
+        self.apply_auto_moves();
+        self.normalize_order();
+    }    
+
     pub fn enumerate_auto_moves(&self, moves: &mut Vec<CardMove>) {
 
         let cascade_moves = self.cascades.iter()

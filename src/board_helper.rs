@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use crate::*;
 
-pub fn parse_board(cascade_string: &str) -> Result<Board, ()> {
+pub fn parse_board(cascade_string: &str, cell_string: Option<&str>) -> Result<Board, ()> {
 
     let card_strings = cascade_string.split_ascii_whitespace();
     let mut cascades: [Vec<Card>; CASCADE_COUNT as usize] = Default::default();
@@ -22,13 +22,23 @@ pub fn parse_board(cascade_string: &str) -> Result<Board, ()> {
         }
     }
 
-    let mut uniq = HashSet::new();
-    let has_duplicates = cascades.iter().flat_map(|cc| cc).any(|&c| !uniq.insert(u8::from(&c)));
+    let cell = match cell_string {
+        Some(cs) => parse_card(cs)?,
+        None => None
+    };
+
+    let mut card_set = HashSet::new();
+    let mut has_duplicates = cascades.iter().flat_map(|cc| cc).any(|&c| !card_set.insert(u8::from(&c)));
+
+    if let Some(card) = cell {
+        has_duplicates &= !card_set.contains(&u8::from(&card));
+    }
+    
     if has_duplicates {
         return Err(());
     }
 
-    Ok(Board::new(cascades, None))
+    Ok(Board::new(cascades, cell))
 }
 
 fn parse_rank(r: &[u8], &suit: &Suit) -> Result<u8, ()> {
@@ -150,7 +160,7 @@ mod tests {
 0	2R	5R	QY	2	-	4B	4G	10Y	6R	9R
 8B	3	12	7R	7	-	13	9Y	10R	QB	17
 8	10B	10G	4R	16	-	8G	JY	9G	3B	3G";
-        let board = board_helper::parse_board(&cascade_string).unwrap();
+        let board = board_helper::parse_board(&cascade_string, None).unwrap();
 
         let card_count = board.cascades().iter().map(|cc| cc.len()).sum::<usize>();
         assert_eq!(card_count, 70);

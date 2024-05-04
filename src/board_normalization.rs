@@ -18,7 +18,7 @@ impl BoardNormalization {
         let new_indices = board.cascades()
             .iter()
             .zip(self.cascade_indices)
-            .map(|(cc, ci)| (cc, ci, Self::stack_id(&cc)))
+            .map(|(cc, ci)| (cc, ci, Self::cascade_rank(&cc)))
             .sorted_by_key(|&(_, _, si)| si)
             .map(|(_, ci, _)| ci)
             .collect::<Vec<u8>>();
@@ -37,8 +37,8 @@ impl BoardNormalization {
         }
      }
 
-     fn stack_id(cc: &Vec<Card>) -> u32 {
-        match cc.first() {
+     pub fn cascade_rank(cascade: &Vec<Card>) -> u32 {
+        match cascade.first() {
             Some(c) => u8::from(c) as u32,
             None => u32::MAX,
         }

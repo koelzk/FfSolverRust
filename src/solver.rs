@@ -3,12 +3,14 @@ use std::{collections::{BinaryHeap, HashMap}, ops::Deref, rc::Rc};
 use crate::{card_move::CardMove, Board, BoardNode, BoardNormalization};
 
 #[repr(u8)]
+#[derive(Debug)]
 pub enum SolveResultStatus {
     Solved,
     ReachedMaxIterations,
     NoSolution,
 }
 
+#[derive(Debug)]
 pub struct SolveResult {
     pub moves: Vec<CardMove>,
     pub iteration: u32,
@@ -104,7 +106,7 @@ impl Solver {
     fn add_node(&mut self, current_node: &BoardNode, card_move: CardMove) {
         let mut next = current_node.board.as_ref().clone();
         next.apply_move(&card_move);
-        next.apply_auto_moves(); //TODO Normalization?
+        next.normalize();
 
         let step = current_node.step + 1;
         let score = next.score(step);        
@@ -158,4 +160,87 @@ impl Solver {
         })
         .collect::<Vec<CardMove>>()
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{collections::BinaryHeap, rc::Rc};
+
+    use crate::{parse_board, Solver};
+
+    #[test]
+    pub fn solve_simple() {
+        let board = parse_board("
+            JG	-	-	-	-	-	-	-	2	-	-
+            KG	-	-	-	-	-	-	-	1	-	-
+            QG	-	-	-	-	-	-	-	0	-	-", None).unwrap();
+        
+        let solver = Solver::new(board);
+        let result = solver.solve(20_000, 100, true);
+
+        let b2 = parse_board("
+        7R  3G  6G  QG  3B  6B  QB  5Y  10  13  21
+        -   3R  4R  3Y  QR  8Y  7G   2  4Y  KG 10G
+        -   11  KB  5B  2Y  JR  19   9  6R  5R   1
+        -   QY  8G  8B 10Y  JG   0  4B  2B  9Y   4
+        -   6Y  5G   8  7B  4G  2R   7  14  16  2G
+        -   20  9R  18  KY   3  7Y  15  12  JY  8R
+        -  10B   6  -  10R   5  JB  KR  9G  9B  17", None).unwrap();
+
+        println!("{}", b2.score(1));
+    }
+
+    #[test]
+    pub fn test_debug() {
+        let board = parse_board("
+       7B   -  3Y  6G  5B  KY 10R  QB   -  5G   -
+        -   -  KR  7G  4B  QY  JB  KB   -  21   -
+        -   -   -  8G   -  JY 10B   -   -  8B   -
+        -   -   -  9G   - 10Y  9B   -   -  3B   -
+        -   -   - 10G   -  9Y   -   -   -  2Y   -
+        -   -   -  JG   -  8Y   -   -   -  6B   -
+        -   -   -  QG   -  7Y   -   -   -  QR   -
+        -   -   -  KG   -  6Y   -   -   -  JR   -
+        -   -   -   -   -  5Y   -   -   -   -   -
+        -   -   -   -   -  4Y   -   -   -   -   -", None).unwrap();
+
+        println!("{}", board);
+        let solver = Solver::new(board);
+        let result = solver.solve(20_000, 100, true);
+        assert!(result.solved());
+    }
+
+    #[test]
+    pub fn test_priority_queue() {
+        let mut bh = BinaryHeap::new();
+        bh.push(Rc::new(100));
+        bh.push(Rc::new(000));
+        bh.push(Rc::new(001));
+        bh.push(Rc::new(010));
+        
+
+        println!("{:?}", bh.pop());
+        println!("{:?}", bh.pop());
+        println!("{:?}", bh.pop());
+        println!("{:?}", bh.pop());
+    }
+
+
+    #[test]
+    pub fn solve() {
+        let board = parse_board("
+            13	5Y	3B	6G	QG	-	6B	21	QB	3G	10
+            KG	2	QR	4R	3Y	-	8Y	10G	7G	3R	4Y
+            5R	9	2Y	KB	5B	-	JR	1	19	11	6R
+            9Y	4B	10Y	8G	8B	-	JG	4	0	QY	2B
+            16	7	7B	5G	8	-	4G	2G	2R	6Y	14
+            JY	15	KY	9R	18	-	3	8R	7Y	20	12
+            9B	KR	10R	6	7R	-	5	17	JB	10B	9G", None).unwrap();
+        
+        let solver = Solver::new(board);
+        let result = solver.solve(200_000, 500, true);
+
+        println!("{result:?}");
+    }
+
 }
