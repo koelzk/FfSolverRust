@@ -22,14 +22,12 @@ pub struct Card {
 impl Card {
     pub fn new(rank: u8, suit: Suit) -> Self {
         if let Suit::MajorArc = suit {
-            if rank < MAJOR_ARC_MIN_RANK || rank > MAJOR_ARC_MAX_RANK {
+            if !(MAJOR_ARC_MIN_RANK..=MAJOR_ARC_MAX_RANK).contains(&rank) {
                 panic!("Rank is out of range [0:21]");
             }
         }
-        else {
-            if rank < ACE_RANK || rank > KING_RANK {
-                panic!("Rank is out of range [1:13]");
-            }
+        else if !(ACE_RANK..=KING_RANK).contains(&rank) {
+            panic!("Rank is out of range [1:13]");
         }
 
         Card {
@@ -57,12 +55,12 @@ impl Card {
 
     pub fn create_deck() -> impl Iterator<Item = Card> {
         let major_arc_cards =
-            (MAJOR_ARC_MIN_RANK..=MAJOR_ARC_MAX_RANK).into_iter().map(|i| Card::new(i, Suit::MajorArc));
+            (MAJOR_ARC_MIN_RANK..=MAJOR_ARC_MAX_RANK).map(|i| Card::new(i, Suit::MajorArc));
 
         const MINOR_ARC_MIN_RANK: u8 = 2;
         const MINOR_ARC_COUNT: u8 = KING_RANK - MINOR_ARC_MIN_RANK + 1;
         let minor_arc_cards =
-            (0..4 * MINOR_ARC_COUNT).into_iter().map(|i| Card::new(i % MINOR_ARC_COUNT + MINOR_ARC_MIN_RANK, Suit::from(i / MINOR_ARC_COUNT)));
+            (0..4 * MINOR_ARC_COUNT).map(|i| Card::new(i % MINOR_ARC_COUNT + MINOR_ARC_MIN_RANK, Suit::from(i / MINOR_ARC_COUNT)));
 
         major_arc_cards.chain(minor_arc_cards)
     }

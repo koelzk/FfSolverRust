@@ -8,17 +8,11 @@ pub struct BoardNormalization {
 }
 
 impl BoardNormalization {
-    pub fn new() -> Self {
-        BoardNormalization {
-            cascade_indices: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-        }
-    }
-
     pub fn advance(&mut self, board: &Board) {
         let new_indices = board.cascades()
             .iter()
             .zip(self.cascade_indices)
-            .map(|(cc, ci)| (cc, ci, Self::cascade_rank(&cc)))
+            .map(|(cc, ci)| (cc, ci, Self::cascade_rank(cc)))
             .sorted_by_key(|&(_, _, si)| si)
             .map(|(_, ci, _)| ci)
             .collect::<Vec<u8>>();
@@ -37,10 +31,18 @@ impl BoardNormalization {
         }
      }
 
-     pub fn cascade_rank(cascade: &Vec<Card>) -> u32 {
+     pub fn cascade_rank(cascade: &[Card]) -> u32 {
         match cascade.first() {
             Some(c) => u8::from(c) as u32,
             None => u32::MAX,
+        }
+    }
+}
+
+impl Default for BoardNormalization {
+    fn default() -> Self {
+        Self {
+            cascade_indices: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
         }
     }
 }
@@ -54,7 +56,7 @@ mod tests {
 
     #[test]
     pub fn test() {
-        let mut bn = BoardNormalization::new();
+        let mut bn = BoardNormalization::default();
         assert_eq!(bn.cascade_indices, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
 
         let card_move = CardMove::new(0, 5, 1);

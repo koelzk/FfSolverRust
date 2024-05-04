@@ -1,8 +1,24 @@
 use std::collections::HashSet;
 
+use thiserror::Error;
+
 use crate::*;
 
-pub fn parse_board(cascade_string: &str, cell_string: Option<&str>) -> Result<Board, ()> {
+#[derive(Error, Debug)]
+pub enum ParseError {
+    #[error("the string `{0}` is not a valid card")]
+    InvalidCard(String),
+    #[error("card sequence has duplicates")]
+    DuplicateCards,
+    #[error("unexpected card {card} (cascade {column}, row {row})")]
+    UnexpectedCard {
+        column: u8,
+        row: u8,
+        card: Card
+    },
+}
+
+pub fn parse_board(cascade_string: &str, cell_string: Option<&str>) -> Result<Board, ParseError> {
 
     let card_strings = cascade_string.split_ascii_whitespace();
     let mut cascades: [Vec<Card>; CASCADE_COUNT as usize] = Default::default();
@@ -15,7 +31,7 @@ pub fn parse_board(cascade_string: &str, cell_string: Option<&str>) -> Result<Bo
         if let Some(c) = card {
 
             if cascades[i].len() != j {
-                return Err(())
+                return Err(ParseError::UnexpectedCard { column: i as u8, row: j as u8, card: c })
             }
 
             cascades[i].push(c);
@@ -28,45 +44,45 @@ pub fn parse_board(cascade_string: &str, cell_string: Option<&str>) -> Result<Bo
     };
 
     let mut card_set = HashSet::new();
-    let mut has_duplicates = cascades.iter().flat_map(|cc| cc).any(|&c| !card_set.insert(u8::from(&c)));
+    let mut has_duplicates = cascades.iter().flatten().any(|&c| !card_set.insert(u8::from(&c)));
 
     if let Some(card) = cell {
         has_duplicates &= !card_set.contains(&u8::from(&card));
     }
     
     if has_duplicates {
-        return Err(());
+        return Err(ParseError::DuplicateCards);
     }
 
     Ok(Board::new(cascades, cell))
 }
 
-fn parse_rank(r: &[u8], &suit: &Suit) -> Result<u8, ()> {
+fn parse_rank(r: &[u8], &suit: &Suit) -> Option<u8> {
     match r {
-        [b @ b'0'..=b'9'] => Ok(b - b'0'),
-        [b'J'] if suit != Suit::MajorArc => Ok(JACK_RANK),
-        [b'Q'] if suit != Suit::MajorArc => Ok(QUEEN_RANK),
-        [b'K'] if suit != Suit::MajorArc => Ok(KING_RANK),
-        [b'1', b'0'] if suit != Suit::MajorArc => Ok(10),
-        [b1 @ b'1'..=b'2', b2 @ b'0'..=b'9'] if suit == Suit::MajorArc => Ok((b1 - b'0') * 10 + (b2 - b'0')),
-        _ => Err(())
+        [b @ b'0'..=b'9'] => Some(b - b'0'),
+        [b'J'] if suit != Suit::MajorArc => Some(JACK_RANK),
+        [b'Q'] if suit != Suit::MajorArc => Some(QUEEN_RANK),
+        [b'K'] if suit != Suit::MajorArc => Some(KING_RANK),
+        [b'1', b'0'] if suit != Suit::MajorArc => Some(10),
+        [b1 @ b'1'..=b'2', b2 @ b'0'..=b'9'] if suit == Suit::MajorArc => Some((b1 - b'0') * 10 + (b2 - b'0')),
+        _ => None
     }
 }
 
-fn parse_suit(seq: &[u8]) -> Result<Suit, ()> {
+fn parse_suit(seq: &[u8]) -> Option<Suit> {
     match seq[seq.len() - 1] {
-        b'0'..=b'9' => Ok(Suit::MajorArc),
-        b'R' => Ok(Suit::Red),
-        b'G' => Ok(Suit::Green),
-        b'B' => Ok(Suit::Blue),
-        b'Y' => Ok(Suit::Yellow),
-        _ => Err(())
+        b'0'..=b'9' => Some(Suit::MajorArc),
+        b'R' => Some(Suit::Red),
+        b'G' => Some(Suit::Green),
+        b'B' => Some(Suit::Blue),
+        b'Y' => Some(Suit::Yellow),
+        _ => None
     }
 }
 
-pub fn parse_card(card_str: &str) -> Result<Option<Card>, ()> {
-    if card_str.len() == 0 || card_str.len() > 3 {
-        return Err(());
+pub fn parse_card(card_str: &str) -> Result<Option<Card>, ParseError> {
+    if card_str.is_empty() || card_str.len() > 3 {
+        return Err(ParseError::InvalidCard(card_str.to_owned()));
     }
 
     if card_str == "-" {
@@ -74,19 +90,20 @@ pub fn parse_card(card_str: &str) -> Result<Option<Card>, ()> {
     }
 
     let seq = card_str.as_bytes();
-    let suit = parse_suit(seq)?;
+    let suit = parse_suit(seq)
+        .ok_or(ParseError::InvalidCard(card_str.to_owned()))?;
 
     match suit {
         Suit::MajorArc => {
-            match parse_rank(seq, &suit)? {
-                rank @ MAJOR_ARC_MIN_RANK..=MAJOR_ARC_MAX_RANK => Ok(Some(Card::new(rank, Suit::MajorArc))),
-                _ => Err(())
+            match parse_rank(seq, &suit) {
+                Some(rank) if (MAJOR_ARC_MIN_RANK..=MAJOR_ARC_MAX_RANK).contains(&rank) => Ok(Some(Card::new(rank, Suit::MajorArc))),
+                _ => Err(ParseError::InvalidCard(card_str.to_owned()))
             }
         }
         _ => {
-            match parse_rank(&seq[0..seq.len() - 1], &suit)? {
-                rank @ MINOR_ARC_MIN_RANK..=MINOR_ARC_MAX_RANK => Ok(Some(Card::new(rank, suit))),
-                _ => Err(())
+            match parse_rank(&seq[0..seq.len() - 1], &suit) {
+                Some(rank) if (MINOR_ARC_MIN_RANK..=MINOR_ARC_MAX_RANK).contains(&rank) => Ok(Some(Card::new(rank, suit))),
+                _ => Err(ParseError::InvalidCard(card_str.to_owned()))
             }
         }
     }
@@ -99,55 +116,55 @@ mod tests {
 
     #[test]
     fn parse_card() {
-        assert_eq!(Ok(Some(Card::new(2, Suit::Red))), board_helper::parse_card("2R"));
-        assert_eq!(Ok(Some(Card::new(5, Suit::Red))), board_helper::parse_card("5R"));
-        assert_eq!(Ok(Some(Card::new(10, Suit::Red))), board_helper::parse_card("10R"));
-        assert_eq!(Ok(Some(Card::new(JACK_RANK, Suit::Red))), board_helper::parse_card("JR"));
-        assert_eq!(Ok(Some(Card::new(QUEEN_RANK, Suit::Red))), board_helper::parse_card("QR"));
-        assert_eq!(Ok(Some(Card::new(KING_RANK, Suit::Red))), board_helper::parse_card("KR"));
+        assert_eq!(Some(Card::new(2, Suit::Red)), board_helper::parse_card("2R").unwrap());
+        assert_eq!(Some(Card::new(5, Suit::Red)), board_helper::parse_card("5R").unwrap());
+        assert_eq!(Some(Card::new(10, Suit::Red)), board_helper::parse_card("10R").unwrap());
+        assert_eq!(Some(Card::new(JACK_RANK, Suit::Red)), board_helper::parse_card("JR").unwrap());
+        assert_eq!(Some(Card::new(QUEEN_RANK, Suit::Red)), board_helper::parse_card("QR").unwrap());
+        assert_eq!(Some(Card::new(KING_RANK, Suit::Red)), board_helper::parse_card("KR").unwrap());
 
-        assert_eq!(Ok(Some(Card::new(2, Suit::Green))), board_helper::parse_card("2G"));
-        assert_eq!(Ok(Some(Card::new(5, Suit::Green))), board_helper::parse_card("5G"));
-        assert_eq!(Ok(Some(Card::new(10, Suit::Green))), board_helper::parse_card("10G"));
-        assert_eq!(Ok(Some(Card::new(JACK_RANK, Suit::Green))), board_helper::parse_card("JG"));
-        assert_eq!(Ok(Some(Card::new(QUEEN_RANK, Suit::Green))), board_helper::parse_card("QG"));
-        assert_eq!(Ok(Some(Card::new(KING_RANK, Suit::Green))), board_helper::parse_card("KG"));
+        assert_eq!(Some(Card::new(2, Suit::Green)), board_helper::parse_card("2G").unwrap());
+        assert_eq!(Some(Card::new(5, Suit::Green)), board_helper::parse_card("5G").unwrap());
+        assert_eq!(Some(Card::new(10, Suit::Green)), board_helper::parse_card("10G").unwrap());
+        assert_eq!(Some(Card::new(JACK_RANK, Suit::Green)), board_helper::parse_card("JG").unwrap());
+        assert_eq!(Some(Card::new(QUEEN_RANK, Suit::Green)), board_helper::parse_card("QG").unwrap());
+        assert_eq!(Some(Card::new(KING_RANK, Suit::Green)), board_helper::parse_card("KG").unwrap());
 
-        assert_eq!(Ok(Some(Card::new(2, Suit::Blue))), board_helper::parse_card("2B"));
-        assert_eq!(Ok(Some(Card::new(5, Suit::Blue))), board_helper::parse_card("5B"));
-        assert_eq!(Ok(Some(Card::new(10, Suit::Blue))), board_helper::parse_card("10B"));
-        assert_eq!(Ok(Some(Card::new(JACK_RANK, Suit::Blue))), board_helper::parse_card("JB"));
-        assert_eq!(Ok(Some(Card::new(QUEEN_RANK, Suit::Blue))), board_helper::parse_card("QB"));
-        assert_eq!(Ok(Some(Card::new(KING_RANK, Suit::Blue))), board_helper::parse_card("KB"));
+        assert_eq!(Some(Card::new(2, Suit::Blue)), board_helper::parse_card("2B").unwrap());
+        assert_eq!(Some(Card::new(5, Suit::Blue)), board_helper::parse_card("5B").unwrap());
+        assert_eq!(Some(Card::new(10, Suit::Blue)), board_helper::parse_card("10B").unwrap());
+        assert_eq!(Some(Card::new(JACK_RANK, Suit::Blue)), board_helper::parse_card("JB").unwrap());
+        assert_eq!(Some(Card::new(QUEEN_RANK, Suit::Blue)), board_helper::parse_card("QB").unwrap());
+        assert_eq!(Some(Card::new(KING_RANK, Suit::Blue)), board_helper::parse_card("KB").unwrap());
 
-        assert_eq!(Ok(Some(Card::new(2, Suit::Yellow))), board_helper::parse_card("2Y"));
-        assert_eq!(Ok(Some(Card::new(5, Suit::Yellow))), board_helper::parse_card("5Y"));
-        assert_eq!(Ok(Some(Card::new(10, Suit::Yellow))), board_helper::parse_card("10Y"));
-        assert_eq!(Ok(Some(Card::new(JACK_RANK, Suit::Yellow))), board_helper::parse_card("JY"));
-        assert_eq!(Ok(Some(Card::new(QUEEN_RANK, Suit::Yellow))), board_helper::parse_card("QY"));
-        assert_eq!(Ok(Some(Card::new(KING_RANK, Suit::Yellow))), board_helper::parse_card("KY"));
+        assert_eq!(Some(Card::new(2, Suit::Yellow)), board_helper::parse_card("2Y").unwrap());
+        assert_eq!(Some(Card::new(5, Suit::Yellow)), board_helper::parse_card("5Y").unwrap());
+        assert_eq!(Some(Card::new(10, Suit::Yellow)), board_helper::parse_card("10Y").unwrap());
+        assert_eq!(Some(Card::new(JACK_RANK, Suit::Yellow)), board_helper::parse_card("JY").unwrap());
+        assert_eq!(Some(Card::new(QUEEN_RANK, Suit::Yellow)), board_helper::parse_card("QY").unwrap());
+        assert_eq!(Some(Card::new(KING_RANK, Suit::Yellow)), board_helper::parse_card("KY").unwrap());
 
-        assert_eq!(Err(()), board_helper::parse_card("AR"));
-        assert_eq!(Err(()), board_helper::parse_card("0R"));
-        assert_eq!(Err(()), board_helper::parse_card("1R"));
-        assert_eq!(Err(()), board_helper::parse_card("11R"));
-        assert_eq!(Err(()), board_helper::parse_card("21R"));
-        assert_eq!(Err(()), board_helper::parse_card("R"));
-        assert_eq!(Err(()), board_helper::parse_card("00R"));
+        assert!(matches!(board_helper::parse_card("AR"), Err(ParseError::InvalidCard(_))));
+        assert!(matches!(board_helper::parse_card("0R"), Err(ParseError::InvalidCard(_))));
+        assert!(matches!(board_helper::parse_card("1R"), Err(ParseError::InvalidCard(_))));
+        assert!(matches!(board_helper::parse_card("11R"), Err(ParseError::InvalidCard(_))));
+        assert!(matches!(board_helper::parse_card("21R"), Err(ParseError::InvalidCard(_))));
+        assert!(matches!(board_helper::parse_card("R"), Err(ParseError::InvalidCard(_))));
+        assert!(matches!(board_helper::parse_card("00R"), Err(ParseError::InvalidCard(_))));
 
-        assert_eq!(Err(()), board_helper::parse_card("AG"));
-        assert_eq!(Err(()), board_helper::parse_card("0G"));
-        assert_eq!(Err(()), board_helper::parse_card("1G"));
-        assert_eq!(Err(()), board_helper::parse_card("11G"));
-        assert_eq!(Err(()), board_helper::parse_card("21G"));
-        assert_eq!(Err(()), board_helper::parse_card("G"));
-        assert_eq!(Err(()), board_helper::parse_card("00G"));
+        assert!(matches!(board_helper::parse_card("AG"), Err(ParseError::InvalidCard(_))));
+        assert!(matches!(board_helper::parse_card("0G"), Err(ParseError::InvalidCard(_))));
+        assert!(matches!(board_helper::parse_card("1G"), Err(ParseError::InvalidCard(_))));
+        assert!(matches!(board_helper::parse_card("11G"), Err(ParseError::InvalidCard(_))));
+        assert!(matches!(board_helper::parse_card("21G"), Err(ParseError::InvalidCard(_))));
+        assert!(matches!(board_helper::parse_card("G"), Err(ParseError::InvalidCard(_))));
+        assert!(matches!(board_helper::parse_card("00G"), Err(ParseError::InvalidCard(_))));
 
-        assert_eq!(Err(()), board_helper::parse_card("22"));
-        assert_eq!(Err(()), board_helper::parse_card("25"));
+        assert!(matches!(board_helper::parse_card("22"), Err(ParseError::InvalidCard(_))));
+        assert!(matches!(board_helper::parse_card("25"), Err(ParseError::InvalidCard(_))));
 
         for rank in MINOR_ARC_MIN_RANK..=MAJOR_ARC_MAX_RANK {
-            assert_eq!(Ok(Some(Card::new(rank, Suit::MajorArc))), board_helper::parse_card(&rank.to_string()));
+            assert_eq!(Some(Card::new(rank, Suit::MajorArc)), board_helper::parse_card(&rank.to_string()).unwrap());
         }
     }
 

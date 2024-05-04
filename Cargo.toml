@@ -16,3 +16,4 @@ path = "src/bin.rs"
 [dependencies]
 rand = "0.8.*"
 itertools = "0.12.*"
+thiserror = "1.0.*"

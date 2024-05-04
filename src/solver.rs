@@ -72,8 +72,8 @@ impl Solver {
             let current = current_node.board.deref();
 
             if current.is_game_won() {
-                if matches!(&solution_node, None) ||
-                    matches!(&solution_node, Some(n) if (*n).step > current_node.step) {
+                if solution_node.is_none() ||
+                    matches!(&solution_node, Some(n) if n.step > current_node.step) {
                     solution_node = Some(current_node.clone());
                     current_max_steps = solution_node.as_ref().unwrap().as_ref().step - 1;
                 }
@@ -144,14 +144,14 @@ impl Solver {
             }
         }
 
-        let mut norm = BoardNormalization::new();
+        let mut norm = BoardNormalization::default();
 
         node_stack.iter().rev()
         .map(|&node| {
             assert!(node.card_move.is_some() && node.previous.is_some());
 
             let mut current_no_norm = node.previous.as_deref().unwrap().clone();
-            current_no_norm.apply_move(&node.card_move.as_ref().unwrap());
+            current_no_norm.apply_move(node.card_move.as_ref().unwrap());
             current_no_norm.apply_auto_moves();
 
             let translated_move = norm.translate(node.card_move.as_ref().unwrap());
@@ -164,9 +164,8 @@ impl Solver {
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::BinaryHeap, rc::Rc};
 
-    use crate::{parse_board, Solver};
+    use crate::{parse_board, SolveResultStatus, Solver};
 
     #[test]
     pub fn solve_simple() {
@@ -178,16 +177,8 @@ mod tests {
         let solver = Solver::new(board);
         let result = solver.solve(20_000, 100, true);
 
-        let b2 = parse_board("
-        7R  3G  6G  QG  3B  6B  QB  5Y  10  13  21
-        -   3R  4R  3Y  QR  8Y  7G   2  4Y  KG 10G
-        -   11  KB  5B  2Y  JR  19   9  6R  5R   1
-        -   QY  8G  8B 10Y  JG   0  4B  2B  9Y   4
-        -   6Y  5G   8  7B  4G  2R   7  14  16  2G
-        -   20  9R  18  KY   3  7Y  15  12  JY  8R
-        -  10B   6  -  10R   5  JB  KR  9G  9B  17", None).unwrap();
-
-        println!("{}", b2.score(1));
+        assert!(result.solved());
+        assert_eq!(result.moves.len(), 2);
     }
 
     #[test]
@@ -204,27 +195,10 @@ mod tests {
         -   -   -   -   -  5Y   -   -   -   -   -
         -   -   -   -   -  4Y   -   -   -   -   -", None).unwrap();
 
-        println!("{}", board);
         let solver = Solver::new(board);
         let result = solver.solve(20_000, 100, true);
         assert!(result.solved());
     }
-
-    #[test]
-    pub fn test_priority_queue() {
-        let mut bh = BinaryHeap::new();
-        bh.push(Rc::new(100));
-        bh.push(Rc::new(000));
-        bh.push(Rc::new(001));
-        bh.push(Rc::new(010));
-        
-
-        println!("{:?}", bh.pop());
-        println!("{:?}", bh.pop());
-        println!("{:?}", bh.pop());
-        println!("{:?}", bh.pop());
-    }
-
 
     #[test]
     pub fn solve() {
@@ -238,9 +212,10 @@ mod tests {
             9B	KR	10R	6	7R	-	5	17	JB	10B	9G", None).unwrap();
         
         let solver = Solver::new(board);
-        let result = solver.solve(200_000, 500, true);
+        let result = solver.solve(5_000, 70, true);
 
-        println!("{result:?}");
+        assert!(matches!(result.status, SolveResultStatus::Solved));
+        assert!(result.moves.len() <= 70);
     }
 
 }

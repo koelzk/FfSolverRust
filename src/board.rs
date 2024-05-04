@@ -8,9 +8,10 @@ use rand::Rng;
 use rand::seq::SliceRandom;
 use itertools::Itertools;
 
+/// Number of cascades
 pub const CASCADE_COUNT: u8 = 11;
 
-#[derive(Clone, Eq, PartialEq, Hash)]
+#[derive(Clone, Eq, PartialEq, Hash, Debug)]
 pub struct Board {
     cell: Option<Card>,
     cascades: [Vec<Card>; CASCADE_COUNT as usize],
@@ -31,7 +32,7 @@ impl Board {
 
         board.update_foundations();
 
-        return board;
+        board
     }
 
     pub fn is_game_won(&self) -> bool {
@@ -50,7 +51,7 @@ impl Board {
         self.minor_fdns.iter()
             .enumerate()
             .map(|(index, &rank)| match rank > ACE_RANK {
-                true => Some(Card::new(rank.clone(), Suit::from(index as u8))),
+                true => Some(Card::new(rank, Suit::from(index as u8))),
                 false => None
             })
     }
@@ -75,7 +76,7 @@ impl Board {
             let mut moves = Vec::<CardMove>::new();
             self.enumerate_auto_moves(&mut moves);
 
-            if moves.len() > 0 {
+            if !moves.is_empty() {
                 for card_move in moves {
                     self.apply_move(&card_move);
                 }
@@ -106,7 +107,7 @@ impl Board {
 
         let cascade_moves = self.cascades.iter()
             .enumerate()
-            .filter(|(_, cascade)| cascade.len() > 0)
+            .filter(|(_, cascade)| !cascade.is_empty())
             .filter_map(|(i, cascade)| {
                 match self.can_remove_card(cascade.last().unwrap()) {
                     true => Some(CardMove::new(i as u8, FOUNDATION, 1)),
@@ -125,7 +126,7 @@ impl Board {
         // Move k cards from cascade i to cascade j:
         let from_cascades = self.cascades.iter()
             .enumerate()
-            .filter(|(_, cascade)| cascade.len() > 0);
+            .filter(|(_, cascade)| !cascade.is_empty());
 
         for (i, from) in from_cascades {
             let stack_size = Board::get_stack_size(from);
@@ -135,7 +136,7 @@ impl Board {
                 .filter(|&(j, _)| i != j);
 
             for (j, to) in to_cascades {
-                if to.len() == 0 || from.last().unwrap().can_place_on(to.last().unwrap()) {
+                if to.is_empty() || from.last().unwrap().can_place_on(to.last().unwrap()) {
                     for k in (1..=stack_size).rev() {
                         moves.push(CardMove::new(i as u8, j as u8, k))
                     }
@@ -147,7 +148,7 @@ impl Board {
             Some(card) => {
                 // Move 1 card from cell to cascade j:
                 for (j, to) in self.cascades.iter().enumerate() {
-                    if to.len() == 0 || card.can_place_on(to.last().unwrap()) {
+                    if to.is_empty() || card.can_place_on(to.last().unwrap()) {
                         moves.push(CardMove::new(CELL, j as u8, 1))
                     }
                 }
@@ -155,7 +156,7 @@ impl Board {
             None => {
                 // Move 1 card from cascade to cell:
                 for (i, from) in self.cascades.iter().enumerate() {
-                    if from.len() > 0 {
+                    if !from.is_empty() {
                         moves.push(CardMove::new(i as u8, CELL, 1))
                     }
                 }            
@@ -187,7 +188,7 @@ impl Board {
         }
         else {
             let suit_index = removed.suit() as usize;
-            assert!(removed.rank() == self.minor_fdns[suit_index] + 1);
+            debug_assert!(removed.rank() == self.minor_fdns[suit_index] + 1);
             self.minor_fdns[suit_index] += 1;
         }
     }
@@ -195,7 +196,7 @@ impl Board {
     fn update_foundations(&mut self) {
         let cell_card: Card;
         let mut all_cards: Vec<&Card> = self.cascades.iter()
-            .flat_map(|cc| cc)
+            .flatten()
             .collect();
 
         if self.cell.is_some() {
@@ -209,7 +210,7 @@ impl Board {
             .group_by(|&c| c.suit())
             .into_iter()
             .map(|(key, group)| {
-                (key as usize, group.map(|c| c.rank() as u8).min().unwrap())
+                (key as usize, group.map(|c| c.rank()).min().unwrap())
             })
             .collect::<HashMap<usize, u8>>();
 
@@ -238,17 +239,15 @@ impl Board {
 
     pub fn apply_move(&mut self, m: &CardMove) {
         if m.from() < CASCADE_COUNT && m.to() < CASCADE_COUNT { // Move from cascade to cascade:
-            assert!(m.from() < CASCADE_COUNT);
-            assert!(m.to() < CASCADE_COUNT && m.to() != m.from());
+            debug_assert!(m.from() < CASCADE_COUNT);
+            debug_assert!(m.to() < CASCADE_COUNT && m.to() != m.from());
     
             let (from, to) = self.get_cascades(m.from(), m.to());
-            assert!(from.len() >= m.count() as usize);
+            debug_assert!(from.len() >= m.count() as usize);
     
             for _ in 0..m.count() {
                 to.push(from.pop().unwrap())
             }
-
-            return;
         }
         else if m.to() == FOUNDATION { // Move card to foundation:
             if m.from() == CELL {
@@ -256,32 +255,24 @@ impl Board {
                 self.cell = None;
             }
             else {
-                assert!(m.from() < CASCADE_COUNT);
+                debug_assert!(m.from() < CASCADE_COUNT);
                 let card = self.cascades[m.from() as usize].pop().unwrap();
                 self.update_foundation(&card);
             }
-
-            return;
         }
         else if m.from() == CELL { // Move from cell to cascade:
-            assert!(self.cell.is_some() && m.to() < CASCADE_COUNT);
+            debug_assert!(self.cell.is_some() && m.to() < CASCADE_COUNT);
 
             let to: &mut Vec<Card> = &mut self.cascades[m.to() as usize];
             to.push(self.cell.unwrap());            
             self.cell = None;
-
-            return;
         }
         else { // Move from cascade to cell:
-            assert!(m.from() < CASCADE_COUNT && self.cell.is_none());
+            debug_assert!(m.from() < CASCADE_COUNT && self.cell.is_none());
 
             let card = self.cascades[m.from() as usize].pop().unwrap();
             self.cell = Some(card);
-
-            return;
         }
-
-
     }
 
     pub fn score(&self, step: u32) -> i32 {
@@ -293,8 +284,8 @@ impl Board {
 
         score += self.cascades.iter().map(|cascade| {
             let stack_size = Board::get_stack_size(cascade) as i32;
-            if cascade.len() == 0 {
-                return 20;
+            if cascade.is_empty() {
+                20
             }
             else if cascade.len() as i32 == stack_size {
                 return stack_size * 2;
@@ -311,7 +302,7 @@ impl Board {
 
         score -= step as i32;
 
-        return score;
+        score
     }
 
     pub fn random(rng: &mut impl Rng) -> Self {
@@ -347,10 +338,10 @@ impl Board {
         }
 
         let fdn = self.minor_fdns[card.suit() as usize];
-        return card.rank() == fdn + 1;
+        card.rank() == fdn + 1
     }
 
-    fn get_stack_size(cascade: &Vec<Card>) -> u8 {
+    fn get_stack_size(cascade: &[Card]) -> u8 {
         if cascade.len() < 2 {
             return cascade.len() as u8;
         }
@@ -368,7 +359,7 @@ impl Board {
             stack_size += 1;
         }
 
-        return stack_size;
+        stack_size
     }
 }
 
@@ -415,15 +406,18 @@ impl Display for Board {
 
 #[cfg(test)]
 mod tests {
+    use rand::{rngs::StdRng, SeedableRng};
+
     use crate::*;
 
     use super::Board;
 
     #[test]
     fn random() {
-        let board = Board::random(&mut rand::thread_rng());
+        let board1 = Board::random(&mut StdRng::seed_from_u64(1337));
+        let board2 = Board::random(&mut StdRng::seed_from_u64(1337));
 
-        print!("{board}");
+        assert_eq!(board1, board2);        
     }
 
 
