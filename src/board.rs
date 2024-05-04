@@ -175,11 +175,13 @@ impl Board {
 
     fn update_foundation(&mut self, removed: &Card) {
         if removed.suit() == Suit::MajorArc {
-            //assert!(removed.rank() == self.major_fdn_low + 1 || removed.rank() == self.major_fdn_high - 1);
-            if removed.rank() as i8 == self.major_fdn_low + 1 {
+            let rank = removed.rank() as i8;
+            debug_assert!(rank == self.major_fdn_low + 1 || rank == self.major_fdn_high - 1);
+            
+            if rank == self.major_fdn_low + 1 {
                 self.major_fdn_low += 1;
             }
-            else if removed.rank() as i8 == self.major_fdn_high - 1 {
+            if rank == self.major_fdn_high - 1 {
                 self.major_fdn_high -= 1;
             }
         }
