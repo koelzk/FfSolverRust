@@ -50,7 +50,7 @@ impl Card {
             return false;
         }
 
-        (self.rank() == other.rank() - 1) || (self.rank() == other.rank() + 1)
+        (self.rank() + 1 == other.rank()) || (self.rank() == other.rank() + 1)
     }
 
     pub fn create_deck() -> impl Iterator<Item = Card> {
