@@ -38,9 +38,9 @@ pub struct Solver {
 }
 
 impl Solver {
-    pub fn new(board: Board) -> Self {
+    pub fn new(board: &Board) -> Self {
         Solver {
-            start: board,
+            start: board.clone(),
             visited: Default::default(),
             queue: Default::default()
         }
@@ -174,7 +174,7 @@ mod tests {
             KG	-	-	-	-	-	-	-	1	-	-
             QG	-	-	-	-	-	-	-	0	-	-", None).unwrap();
         
-        let solver = Solver::new(board);
+        let solver = Solver::new(&board);
         let result = solver.solve(20_000, 100, true);
 
         assert!(result.solved());
@@ -195,7 +195,7 @@ mod tests {
         -   -   -   -   -  5Y   -   -   -   -   -
         -   -   -   -   -  4Y   -   -   -   -   -", None).unwrap();
 
-        let solver = Solver::new(board);
+        let solver = Solver::new(&board);
         let result = solver.solve(20_000, 100, true);
         assert!(result.solved());
     }
@@ -211,7 +211,7 @@ mod tests {
             JY	15	KY	9R	18	-	3	8R	7Y	20	12
             9B	KR	10R	6	7R	-	5	17	JB	10B	9G", None).unwrap();
         
-        let solver = Solver::new(board);
+        let solver = Solver::new(&board);
         let result = solver.solve(5_000, 70, true);
 
         assert!(matches!(result.status, SolveResultStatus::Solved));

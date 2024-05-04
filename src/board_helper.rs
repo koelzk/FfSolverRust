@@ -1,5 +1,8 @@
 use std::collections::HashSet;
 
+use itertools::Itertools;
+use rand::{RngCore, SeedableRng};
+use rand_xoshiro::Xoshiro256PlusPlus;
 use thiserror::Error;
 
 use crate::*;
@@ -109,10 +112,32 @@ pub fn parse_card(card_str: &str) -> Result<Option<Card>, ParseError> {
     }
 }
 
+pub fn create_random_board(seed: u64) -> Board {
+    let hashes = (0..70)
+        .scan(Xoshiro256PlusPlus::seed_from_u64(seed), |rng, _| Some(rng.next_u64()));
+
+    let deck = Card::create_deck()
+        .zip(hashes)
+        .sorted_by_key(|(_, i)| *i)
+        .map(|(card, _)| card)
+        .collect::<Vec<Card>>();
+
+    let mut cascades: [Vec<Card>; CASCADE_COUNT as usize] = Default::default();
+
+    for (card, i) in deck.iter().enumerate().map(|(i, c)| (c, i / 7)) {
+        match i > 4 {
+            false => cascades[i].push(*card),
+            true => cascades[i + 1].push(*card),
+        }
+    }
+    Board::new(cascades, None)
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::{*};
+    use std::time::Instant;
 
+    use crate::{*};
 
     #[test]
     fn parse_card() {
@@ -205,6 +230,28 @@ mod tests {
         assert_eq!(board.cascades()[10][6], Card::new(3, Suit::Green));        
 
         assert_eq!(board.cascades()[5].is_empty(), true);
+    }
+
+    #[test]
+    pub fn create_random_board() {
+        let mut solved = 0;
+        let start = Instant::now();
+
+        for seed in 0..10 {
+            let board = board_helper::create_random_board(seed);
+
+            let solver = Solver::new(&board);
+            let result = solver.solve(100_000, 100, true);
+
+            println!("{seed} => {:?}", result.status);
+
+            if result.solved() {
+                solved += 1;
+            }
+        }
+
+        let elapsed = (Instant::now() - start).as_secs_f64();
+        println!("{solved} solved. Took {elapsed:.3} sec");
     }
 
 }
