@@ -10,7 +10,7 @@ use itertools::Itertools;
 
 pub const CASCADE_COUNT: u8 = 11;
 
-#[derive(Clone)]
+#[derive(Clone, Eq, PartialEq, Hash)]
 pub struct Board {
     cell: Option<Card>,
     cascades: [Vec<Card>; CASCADE_COUNT as usize],

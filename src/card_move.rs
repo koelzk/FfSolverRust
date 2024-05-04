@@ -6,6 +6,7 @@ pub const CELL: u8 = 255;
 /// Represents the foundation as target location
 pub const FOUNDATION: u8 = 254;
 
+#[derive(Debug, Eq, PartialEq)]
 pub struct CardMove {
     from: u8,
     to: u8,

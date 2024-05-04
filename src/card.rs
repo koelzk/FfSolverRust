@@ -14,7 +14,7 @@ const SUIT_STRINGS: &[&str; 5] = &["♥", "♣", "♠", "♦", ""];
 static MAJOR_ARC_RANK_STRINGS : &[&str; MAJOR_ARC_MAX_RANK as usize + 1] = &["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21"];
 static MINOR_ARC_RANK_STRINGS : &[&str; KING_RANK as usize + 1] = &["?", "A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
 
-#[derive(Copy, Clone, PartialEq, Eq)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub struct Card {
     value: u8
 }

@@ -6,8 +6,8 @@ pub struct BoardNode {
     pub board: Rc<Board>,
     pub previous: Option<Rc<Board>>,
     pub card_move: Option<CardMove>,
-    pub step: usize,
-    pub score: isize
+    pub step: u32,
+    pub score: i32
 }
 
 impl Ord for BoardNode {
