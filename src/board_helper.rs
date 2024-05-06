@@ -7,6 +7,7 @@ use thiserror::Error;
 
 use crate::*;
 
+/// Errors caused by parsing cards and boards
 #[derive(Error, Debug)]
 pub enum ParseError {
     #[error("the string `{0}` is not a valid card")]
@@ -21,6 +22,30 @@ pub enum ParseError {
     },
 }
 
+/// Parse a board state from the specified cascades and cell strings.
+/// Cascade string is a whitespace separated list of up to 70 card strings
+/// representing the board layout from left to top, top to bottom.
+/// See also [parse_card()]
+/// # Examples
+/// ```
+/// # use ff_solver_lib::{*};
+/// # fn main() -> Result<(), ParseError> {
+/// let cascades_str = "
+///     10  11  KR  6   QG  -   7Y  6Y  QR  JR  20
+///     5   1   4   JG  5G  -   7B  2Y  15  5Y  7G
+///     8Y  3R  5B  2G  18  -   6G  19  JB  4Y  21
+///     9   KB  KG  3Y  KY  -   8R  9B  14  6B  2B
+///     0   2R  5R  QY  2   -   4B  4G  10Y 6R  9R
+///     8B  3   12  7R  7   -   13  9Y  10R QB  17
+///     8   10B 10G 4R  16  -   8G  JY  -   3B  3G";
+/// 
+/// let board = parse_board(cascades_str, Some("9G"))?;
+/// assert_eq!(board.cascades()[0][0], Card::new(10, Suit::MajorArc));
+/// assert_eq!(board.cascades()[10][6], Card::new(3, Suit::Green));
+/// println!("Board:\n{board}");
+/// # Ok(())
+/// # }
+/// ```
 pub fn parse_board(cascade_string: &str, cell_string: Option<&str>) -> Result<Board, ParseError> {
 
     let card_strings = cascade_string.split_ascii_whitespace();
@@ -50,7 +75,7 @@ pub fn parse_board(cascade_string: &str, cell_string: Option<&str>) -> Result<Bo
     let mut has_duplicates = cascades.iter().flatten().any(|&c| !card_set.insert(u8::from(&c)));
 
     if let Some(card) = cell {
-        has_duplicates &= !card_set.contains(&u8::from(&card));
+        has_duplicates |= card_set.contains(&u8::from(&card));
     }
     
     if has_duplicates {
@@ -83,6 +108,21 @@ fn parse_suit(seq: &[u8]) -> Option<Suit> {
     }
 }
 
+/// Parse a single card from the specified string.
+/// - `-` represents an empty position
+/// - `(2|3|4|5|6|7|8|9|10|J|Q|K)(R|G|B|Y)` represents a minor arcana card of rank 2-10,
+///   Jack, Queen or King and suit of **R**ed, **G**reen, **B**lue or **Y**ellow (e.g., `10G`)
+/// - `0-21` represents a major arcana card of rank 0-21
+/// # Examples
+/// ```
+/// # use ff_solver_lib::{*};
+/// # fn main() -> Result<(), ParseError> {
+/// assert_eq!(parse_card("9G").unwrap(), Some(Card::new(9, Suit::Green)));
+/// assert_eq!(parse_card("-").unwrap(), None);
+/// assert!(matches!(parse_card("invalid"), Err(ParseError::InvalidCard(_))));
+/// # Ok(())
+/// # }
+/// ```
 pub fn parse_card(card_str: &str) -> Result<Option<Card>, ParseError> {
     if card_str.is_empty() || card_str.len() > 3 {
         return Err(ParseError::InvalidCard(card_str.to_owned()));
@@ -113,18 +153,18 @@ pub fn parse_card(card_str: &str) -> Result<Option<Card>, ParseError> {
 }
 
 pub fn create_random_board(seed: u64) -> Board {
-    let hashes = (0..70)
+    let ranks = (0..70)
         .scan(Xoshiro256PlusPlus::seed_from_u64(seed), |rng, _| Some(rng.next_u64()));
 
-    let deck = Card::create_deck()
-        .zip(hashes)
+    let shuffled_deck = Card::create_deck()
+        .zip(ranks)
         .sorted_by_key(|(_, i)| *i)
         .map(|(card, _)| card)
         .collect::<Vec<Card>>();
 
     let mut cascades: [Vec<Card>; CASCADE_COUNT as usize] = Default::default();
 
-    for (card, i) in deck.iter().enumerate().map(|(i, c)| (c, i / 7)) {
+    for (card, i) in shuffled_deck.iter().enumerate().map(|(i, c)| (c, i / 7)) {
         match i > 4 {
             false => cascades[i].push(*card),
             true => cascades[i + 1].push(*card),
@@ -195,13 +235,14 @@ mod tests {
 
     #[test]
     fn parse_board() {
-        let cascade_string = "10	11	KR	6	QG	-	7Y	6Y	QR	JR	20
-5	1	4	JG	5G	-	7B	2Y	15	5Y	7G
-8Y	3R	5B	2G	18	-	6G	19	JB	4Y	21
-9	KB	KG	3Y	KY	-	8R	9B	14	6B	2B
-0	2R	5R	QY	2	-	4B	4G	10Y	6R	9R
-8B	3	12	7R	7	-	13	9Y	10R	QB	17
-8	10B	10G	4R	16	-	8G	JY	9G	3B	3G";
+        let cascade_string = "
+10  11  KR  6   QG  -   7Y  6Y  QR  JR  20
+5   1   4   JG  5G  -   7B  2Y  15  5Y  7G
+8Y  3R  5B  2G  18  -   6G  19  JB  4Y  21
+9   KB  KG  3Y  KY  -   8R  9B  14  6B  2B
+0   2R  5R  QY  2   -   4B  4G  10Y 6R  9R
+8B  3   12  7R  7   -   13  9Y  10R QB  17
+8   10B 10G 4R  16  -   8G  JY  9G  3B  3G";
         let board = board_helper::parse_board(&cascade_string, None).unwrap();
 
         let card_count = board.cascades().iter().map(|cc| cc.len()).sum::<usize>();
@@ -233,7 +274,17 @@ mod tests {
     }
 
     #[test]
-    pub fn create_random_board() {
+    fn parse_board_error() {
+        assert!(matches!(board_helper::parse_board("10G", Some("10G")), Err(ParseError::DuplicateCards)));
+        assert!(matches!(board_helper::parse_board("1 1", None), Err(ParseError::DuplicateCards)));
+        assert!(matches!(board_helper::parse_board("- - - - - - - - - - -\n1", None),
+            Err(ParseError::UnexpectedCard { column, row, card }) if column == 0 && row == 1 && card == Card::new(1, Suit::MajorArc)));
+        assert!(matches!(board_helper::parse_board("11G", None), Err(ParseError::InvalidCard(s)) if s == "11G"));
+    }
+
+
+    #[test]
+    fn create_random_board() {
         let mut solved = 0;
         let start = Instant::now();
 

@@ -1,6 +1,6 @@
 use std::{collections::{BinaryHeap, HashMap}, ops::Deref, rc::Rc};
 
-use crate::{card_move::CardMove, Board, BoardNode, BoardNormalization};
+use crate::{card_move::CardMove, Board, BoardNode, CascadeMap};
 
 #[repr(u8)]
 #[derive(Debug)]
@@ -144,7 +144,7 @@ impl Solver {
             }
         }
 
-        let mut norm = BoardNormalization::default();
+        let mut cascade_map = CascadeMap::default();
 
         node_stack.iter().rev()
         .map(|&node| {
@@ -154,8 +154,8 @@ impl Solver {
             current_no_norm.apply_move(node.card_move.as_ref().unwrap());
             current_no_norm.apply_auto_moves();
 
-            let translated_move = norm.translate(node.card_move.as_ref().unwrap());
-            norm.advance(&current_no_norm);
+            let translated_move = cascade_map.translate(node.card_move.as_ref().unwrap());
+            cascade_map.advance(&current_no_norm);
             translated_move
         })
         .collect::<Vec<CardMove>>()
