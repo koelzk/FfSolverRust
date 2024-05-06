@@ -3,11 +3,11 @@ use itertools::Itertools;
 use crate::{card_move::CardMove, Board, Card, CASCADE_COUNT};
 
 
-pub struct BoardNormalization {
+pub struct CascadeMap {
     cascade_indices: [u8; CASCADE_COUNT as usize]
 }
 
-impl BoardNormalization {
+impl CascadeMap {
     pub fn advance(&mut self, board: &Board) {
         let new_indices = board.cascades()
             .iter()
@@ -39,7 +39,7 @@ impl BoardNormalization {
     }
 }
 
-impl Default for BoardNormalization {
+impl Default for CascadeMap {
     fn default() -> Self {
         Self {
             cascade_indices: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
@@ -56,7 +56,7 @@ mod tests {
 
     #[test]
     pub fn test() {
-        let mut bn = BoardNormalization::default();
+        let mut bn = CascadeMap::default();
         assert_eq!(bn.cascade_indices, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
 
         let card_move = CardMove::new(0, 5, 1);
