@@ -1,9 +1,7 @@
 use std::fs;
 use clap::Parser;
-use rand::{rngs::StdRng, SeedableRng};
 
 use ff_solver_lib::*;
-
 
 /// Simple program to greet a person
 #[derive(Parser, Debug)]
@@ -54,7 +52,7 @@ fn main() {
     };
 
     if let SolveResultStatus::Solved = result.status {
-        println!("");
+        println!();
 
         let mut b = board.clone();
         for (index, card_move) in result.moves.iter().enumerate() {
