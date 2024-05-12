@@ -19,7 +19,7 @@ jobs:
       with:
         fetch-depth: 1
     - name: Prepare
-      run: sudo apt-get update && sudo apt-get -y --no-install-recommends install libgtk-4-dev
+      run: sudo apt-get update && sudo apt-get -y --no-install-recommends install libgtk-4-dev libadwaita-1-dev
     - name: Build
       run: cargo build --verbose
     - name: Run tests
