@@ -16,6 +16,10 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+      with:
+        fetch-depth: 1
+    - name: Prepare
+      run: sudo apt-get install libgtk-4-dev
     - name: Build
       run: cargo build --verbose
     - name: Run tests
