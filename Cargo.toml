@@ -9,7 +9,11 @@ path = "src/lib.rs"
 
 [[bin]]
 name = "ff_solver_app"
-path = "src/bin.rs"
+path = "src/solve_cli.rs"
+
+[[bin]]
+name = "ff_solver_ui_app"
+path = "src/solve_ui.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -18,5 +22,7 @@ rand = "0.8.*"
 itertools = "0.12.*"
 thiserror = "1.0.*"
 md5 = "0.7.*"
+gtk4 = "*"
 rand_xoshiro = "0.6.*"
 clap = { version = "4.5.*", features = ["derive"] }
+adw = { version = "0.6.0", package = "libadwaita" }
